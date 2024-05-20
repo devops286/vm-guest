@@ -14,12 +14,30 @@ body=""
 
 # Loop through each ESXi host
 for host in "${hosts[@]}"; do
-    # Run esxcli command to get NIC statistics
-    nic_stats=$(ssh $host 'esxcli network nic stats get')
+    # Add a separator for each host in the email body
+    body+="CRC errors for host $host:\n"
     
-    # Add NIC statistics for the current host to the email body
-    body+="CRC errors for host $host:\n\n$nic_stats\n\n"
+    # Run esxcli command to list NICs
+    nics=$(ssh "$host" 'esxcli network nic list | awk "NR>1 {print \$1}"')
+    
+    # Loop through each NIC and get its statistics
+    for nic in $nics; do
+        nic_stats=$(ssh "$host" "esxcli network nic stats get -n $nic | grep 'CRC Errors'")
+        
+        if [[ $nic_stats == *"CRC Errors"* ]]; then
+            crc_errors=$(echo $nic_stats | awk '{print $3}')
+            
+            # Check if CRC errors are greater than 0
+            if [[ $crc_errors -gt 0 ]]; then
+                body+="NIC: $nic, CRC Errors: $crc_errors\n"
+            fi
+        fi
+    done
+    
+    body+="\n"
 done
 
-# Send email
-echo -e "$body" | mail -s "$subject" "$recipient"
+# Send email if there are any CRC errors
+if [[ -n "$body" ]]; then
+    echo -e "$body" | mail -s "$subject" "$recipient"
+fi
