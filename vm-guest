@@ -1,0 +1,25 @@
+#!/bin/bash
+
+# List of ESXi hosts
+hosts=(
+    "host1.example.com"
+    "host2.example.com"
+    # Add more hosts as needed
+)
+
+# Email settings
+recipient="your_email@example.com"
+subject="CRC Errors Report"
+body=""
+
+# Loop through each ESXi host
+for host in "${hosts[@]}"; do
+    # Run esxcli command to get NIC statistics
+    nic_stats=$(ssh $host 'esxcli network nic stats get')
+    
+    # Add NIC statistics for the current host to the email body
+    body+="CRC errors for host $host:\n\n$nic_stats\n\n"
+done
+
+# Send email
+echo -e "$body" | mail -s "$subject" "$recipient"
