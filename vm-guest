@@ -1,2 +1,55 @@
 [root@dny2d1kss02 ~]# ssh root@dny2d1vqa01 esxcli network nic  stats get -n vmnic2 |grep -i "crc error"
    Receive CRC errors: 0
+
+
+
+#!/bin/bash
+
+# List of ESXi hosts
+hosts=(
+    "dny2d1vqa01"
+    # Add more hosts as needed
+)
+
+# List of NICs to check
+nics=(
+    "vmnic0"
+    "vmnic1"
+    "vmnic2"
+    "vmnic3"
+)
+
+# Email settings
+recipient="your_email@example.com"
+subject="CRC Errors Report"
+body=""
+
+# Loop through each ESXi host
+for host in "${hosts[@]}"; do
+    # Add a separator for each host in the email body
+    host_has_errors=false
+    host_body="CRC errors for host $host:\n"
+    
+    # Loop through each NIC and get its statistics
+    for nic in "${nics[@]}"; do
+        nic_stats=$(ssh "root@$host" "esxcli network nic stats get -n $nic | grep -i 'crc error'")
+        if [[ $? -eq 0 ]]; then
+            crc_errors=$(echo $nic_stats | awk '{print $4}')
+            # Check if CRC errors are greater than 0
+            if [[ $crc_errors -gt 0 ]]; then
+                host_body+="NIC: $nic, CRC Errors: $crc_errors\n"
+                host_has_errors=true
+            fi
+        fi
+    done
+
+    # Only append to the main body if there were errors on this host
+    if [ "$host_has_errors" = true ]; then
+        body+="$host_body\n"
+    fi
+done
+
+# Send email if there are any CRC errors
+if [[ -n "$body" ]]; then
+    echo -e "$body" | mail -s "$subject" "$recipient"
+fi
